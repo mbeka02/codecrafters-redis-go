@@ -8,10 +8,10 @@ import (
 )
 
 func handleConnection(conn net.Conn) {
-	defer func() {
-		log.Println("...closing the connection")
-		conn.Close()
-	}()
+	// defer func() {
+	// 	log.Println("...closing the connection")
+	// 	conn.Close()
+	// }()
 	log.Println("...handling connection from:", conn.RemoteAddr())
 	resp := "+PONG\r\n"
 	_, err := conn.Write([]byte(resp))
