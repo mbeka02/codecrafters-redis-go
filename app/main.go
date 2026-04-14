@@ -16,7 +16,7 @@ func handleConnection(conn net.Conn) {
 	resp := "+PONG\r\n"
 	_, err := conn.Write([]byte(resp))
 	if err != nil {
-		fmt.Println("Erroor writing bytes over the TCP connection")
+		fmt.Println("Error writing bytes over the TCP connection")
 		// TODO: Handle this differently don't just crash the program
 		os.Exit(1)
 	}
@@ -28,7 +28,7 @@ func main() {
 		fmt.Println("Failed to bind to port 6379")
 		os.Exit(1)
 	}
-	defer listener.Close()
+	// defer listener.Close()
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
