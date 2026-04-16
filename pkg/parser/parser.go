@@ -34,7 +34,7 @@ func Parse(payload []byte) (response string, err error) {
 	log.Println("Remaining parts:", remainingParts)
 	// get the command.
 
-	remainingPartsArray := strings.SplitN(remainingParts, CRLF, 3)
+	remainingPartsArray := strings.SplitN(remainingParts, CRLF, 2)
 	log.Println("remainingPartsArray:", remainingPartsArray)
 	command := remainingPartsArray[1]
 	log.Println("Command:", command)
