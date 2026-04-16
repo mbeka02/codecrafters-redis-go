@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/codecrafters-io/redis-starter-go/pkg/parser"
+	"github.com/codecrafters-io/redis-starter-go/internal/parser"
 )
 
 func handleConnection(conn net.Conn) {

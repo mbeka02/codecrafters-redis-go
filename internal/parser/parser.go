@@ -4,18 +4,22 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"github.com/codecrafters-io/redis-starter-go/internal/store"
 )
 
 const CRLF = "\r\n"
 
-// Parser holds the raw payload and a cursor position.
+// Parser holds the raw payload , cursor position and a reference to the storage engine
 type Parser struct {
 	data   string
 	cursor int
+	store  *store.Store
 }
 
 func newParser(payload []byte) *Parser {
-	return &Parser{data: string(payload), cursor: 0}
+	store := store.NewStore()
+	return &Parser{data: string(payload), cursor: 0, store: store}
 }
 
 // readLine reads up to the next CRLF, advances the cursor past it, and
@@ -96,9 +100,27 @@ func Parse(payload []byte) (string, error) {
 		return handleEcho(elements)
 	case "PING":
 		return "+PONG\r\n", nil
+	case "SET":
+		return handleSet(elements)
+	case "GET":
+		return handleGet(elements)
 	default:
 		return "", fmt.Errorf("unknown command: %q", command)
 	}
+}
+
+// handleSet sets a key to a value and return a RESP simple string
+func handleSet(elements []string) (string, error) {
+	if len(elements) < 2 {
+		return "", fmt.Errorf("SET requires exactly 1 argument, got %d", len(elements)-1)
+	}
+	fmt.Println("SET elements:", elements)
+	return "+OK\r\n", nil
+}
+
+func handleGet(elements []string) (string, error) {
+	fmt.Println("GET elements:", elements)
+	return "", nil
 }
 
 // handleEcho validates args and returns the RESP bulk string response.
