@@ -5,6 +5,8 @@ import (
 	"log"
 	"net"
 	"os"
+
+	"github.com/codecrafters-io/redis-starter-go/pkg/parser"
 )
 
 func handleConnection(conn net.Conn) {
@@ -23,9 +25,16 @@ func handleConnection(conn net.Conn) {
 			os.Exit(1)
 
 		}
-		log.Println("Received:", string(buf))
-		resp := "+PONG\r\n"
-		_, err = conn.Write([]byte(resp))
+		// log.Println("Received:", string(buf))
+		// resp := "+PONG\r\n"
+		response, err := parser.Parse(buf)
+		if err != nil {
+			log.Println("Error parsing the request:", err)
+			// TODO: Handle this differently
+			os.Exit(1)
+
+		}
+		_, err = conn.Write([]byte(response))
 		if err != nil {
 			log.Println("Error writing bytes over the TCP connection")
 			// TODO: Handle this differently
