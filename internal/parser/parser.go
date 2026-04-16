@@ -18,9 +18,8 @@ type Parser struct {
 	store  *store.Store
 }
 
-func newParser(payload []byte) *Parser {
-	store := store.NewStore()
-	return &Parser{data: string(payload), cursor: 0, store: store}
+func newParser(payload []byte, s *store.Store) *Parser {
+	return &Parser{data: string(payload), cursor: 0, store: s}
 }
 
 // readLine reads up to the next CRLF, advances the cursor past it, and
@@ -67,8 +66,8 @@ func (p *Parser) readBulkString() (string, error) {
 
 // Parse accepts raw bytes and parses them as a RESP array.
 // Returns the server response string to write back to the client.
-func Parse(payload []byte) (string, error) {
-	p := newParser(payload)
+func Parse(payload []byte, s *store.Store) (string, error) {
+	p := newParser(payload, s)
 
 	// --- 1. Parse the array header: *<count>\r\n ---
 	header, err := p.readLine()
