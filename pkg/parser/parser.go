@@ -30,20 +30,17 @@ func Parse(payload []byte) (response string, err error) {
 		log.Println("Empty RESP Array")
 		return response, nil
 	}
-	// loop through  the remaining elements
 	remainingParts := payloadString[len(firstPart)+len(CRLF):]
 	log.Println("Remaining parts:", remainingParts)
 	// get the command.
-	cmdIndex := strings.Index(remainingParts, CRLF)
-	if cmdIndex == -1 {
-		return response, fmt.Errorf("Malformed RESP array")
-	}
-	command := remainingParts[:cmdIndex]
+
+	remainingPartsArray := strings.SplitN(remainingParts, CRLF, 3)
+	command := remainingPartsArray[1]
 	log.Println("Command:", command)
 	switch strings.ToLower(command) {
 	case "echo":
 		log.Println("Echo")
-		response = remainingParts[len(command)+len(CRLF):]
+		response = remainingPartsArray[2]
 	default:
 		log.Println("invalid command")
 		err = fmt.Errorf("invalid command")
