@@ -94,6 +94,8 @@ func Parse(payload []byte) (string, error) {
 	switch command {
 	case "ECHO":
 		return handleEcho(elements)
+	case "PING":
+		return "+PONG\r\n", nil
 	default:
 		return "", fmt.Errorf("unknown command: %q", command)
 	}
