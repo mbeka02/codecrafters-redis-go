@@ -2,51 +2,109 @@ package parser
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 )
 
-var CRLF = "\r\n"
+const CRLF = "\r\n"
 
-// Parse() accepts raw bytes and parses them using the RESP spec.
-func Parse(payload []byte) (response string, err error) {
-	// payload structure
-	//*<number-of-elements>\r\n<element-1>...<element-n>
-	// expect something like: *2\r\n$4\r\nECHO\r\n$3\r\nhey\r\n. This is the RESP encoding of ["ECHO", "hey"].
-	payloadString := string(payload)
-	// split the payload into it's parts.
-	// look for the first occurence of the CRLF , this first part is an asterisk and the number of elements in the array
-	idx := strings.Index(payloadString, CRLF)
-	if idx == -1 {
-		return response, fmt.Errorf("Malformed RESP array")
-	}
-	// get the number of elements
-	firstPart := payloadString[:idx]
-	log.Println("First Part=>", firstPart)
-	numberOfElements, _ := strconv.Atoi(firstPart[1:])
-	// handle empty resp array
-	if numberOfElements == 0 {
-		log.Println("Empty RESP Array")
-		return response, nil
-	}
-	remainingParts := payloadString[len(firstPart)+len(CRLF):]
-	log.Println("Remaining parts:", remainingParts)
-	// get the command.
-
-	remainingPartsArray := strings.SplitN(remainingParts, CRLF, 2)
-	log.Println("remainingPartsArray:", remainingPartsArray, "length:", len(remainingPartsArray))
-	command := remainingPartsArray[1]
-	log.Println("Command:", command)
-	switch strings.ToLower(command) {
-	case "echo":
-		log.Println("Echo Response:", remainingPartsArray[2])
-		response = remainingPartsArray[2]
-	default:
-		log.Println("invalid command")
-		err = fmt.Errorf("invalid command")
-	}
-	return response, nil
+// Parser holds the raw payload and a cursor position.
+type Parser struct {
+	data   string
+	cursor int
 }
 
-func handleEcho() {}
+func newParser(payload []byte) *Parser {
+	return &Parser{data: string(payload), cursor: 0}
+}
+
+// readLine reads up to the next CRLF, advances the cursor past it, and
+// returns the line content (without the CRLF).
+func (p *Parser) readLine() (string, error) {
+	idx := strings.Index(p.data[p.cursor:], CRLF)
+	if idx == -1 {
+		return "", fmt.Errorf("expected CRLF, none found (cursor=%d)", p.cursor)
+	}
+	line := p.data[p.cursor : p.cursor+idx]
+	p.cursor += idx + len(CRLF)
+	return line, nil
+}
+
+// readBulkString parses a RESP bulk string: $<len>\r\n<data>\r\n
+func (p *Parser) readBulkString() (string, error) {
+	line, err := p.readLine()
+	if err != nil {
+		return "", err
+	}
+	if len(line) == 0 || line[0] != '$' {
+		return "", fmt.Errorf("expected bulk string prefix '$', got %q", line)
+	}
+
+	expectedLen, err := strconv.Atoi(line[1:])
+	if err != nil {
+		return "", fmt.Errorf("invalid bulk string length %q: %w", line[1:], err)
+	}
+
+	// Null bulk string ($-1)
+	if expectedLen == -1 {
+		return "", nil
+	}
+
+	data, err := p.readLine()
+	if err != nil {
+		return "", err
+	}
+	if len(data) != expectedLen {
+		return "", fmt.Errorf("bulk string length mismatch: declared %d, got %d", expectedLen, len(data))
+	}
+	return data, nil
+}
+
+// Parse accepts raw bytes and parses them as a RESP array.
+// Returns the server response string to write back to the client.
+func Parse(payload []byte) (string, error) {
+	p := newParser(payload)
+
+	// --- 1. Parse the array header: *<count>\r\n ---
+	header, err := p.readLine()
+	if err != nil || len(header) == 0 || header[0] != '*' {
+		return "", fmt.Errorf("malformed RESP array header: %w", err)
+	}
+
+	count, err := strconv.Atoi(header[1:])
+	if err != nil {
+		return "", fmt.Errorf("invalid element count %q: %w", header[1:], err)
+	}
+	if count == 0 {
+		return "", nil
+	}
+
+	// --- 2. Read all bulk string elements into a slice ---
+	elements := make([]string, 0, count)
+	for i := 0; i < count; i++ {
+		val, err := p.readBulkString()
+		if err != nil {
+			return "", fmt.Errorf("error reading element %d: %w", i, err)
+		}
+		elements = append(elements, val)
+	}
+
+	// --- 3. Dispatch on the command ---
+	command := strings.ToUpper(elements[0])
+	switch command {
+	case "ECHO":
+		return handleEcho(elements)
+	default:
+		return "", fmt.Errorf("unknown command: %q", command)
+	}
+}
+
+// handleEcho validates args and returns the RESP bulk string response.
+func handleEcho(elements []string) (string, error) {
+	if len(elements) < 2 {
+		return "", fmt.Errorf("ECHO requires exactly 1 argument, got %d", len(elements)-1)
+	}
+	msg := elements[1]
+	// Encode the response as a RESP bulk string: $<len>\r\n<data>\r\n
+	return fmt.Sprintf("$%d\r\n%s\r\n", len(msg), msg), nil
+}

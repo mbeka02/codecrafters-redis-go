@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"net"
@@ -18,27 +19,25 @@ func handleConnection(conn net.Conn) {
 
 		log.Println("...handling connection from:", conn.RemoteAddr())
 		buf := make([]byte, 1024)
-		_, err := conn.Read(buf)
+		n, err := conn.Read(buf)
 		if err != nil {
-			log.Println("Error reading the bytes sent")
-			// TODO: Handle this differently
-			os.Exit(1)
-
+			if errors.Is(err, net.ErrClosed) {
+				log.Println("Connection closed", err)
+			} else {
+				log.Println("Error reading the bytes sent:", err)
+			}
+			return
 		}
-		// log.Println("Received:", string(buf))
-		// resp := "+PONG\r\n"
-		response, err := parser.Parse(buf)
+		response, err := parser.Parse(buf[:n]) // only parse upto what was read
 		if err != nil {
-			log.Println("Error parsing the request:", err)
-			// TODO: Handle this differently
-			os.Exit(1)
-
+			log.Println("parse error:", err)
+			conn.Write([]byte("-ERR " + err.Error() + "\r\n")) // send RESP error to client
+			continue
 		}
 		_, err = conn.Write([]byte(response))
 		if err != nil {
-			log.Println("Error writing bytes over the TCP connection")
-			// TODO: Handle this differently
-			os.Exit(1)
+			log.Println("Write error:", err)
+			return
 		}
 	}
 }
