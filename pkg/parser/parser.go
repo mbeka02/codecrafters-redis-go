@@ -40,7 +40,7 @@ func Parse(payload []byte) (response string, err error) {
 	log.Println("Command:", command)
 	switch strings.ToLower(command) {
 	case "echo":
-		log.Println("Echo")
+		log.Println("Echo Response:", remainingPartsArray[2])
 		response = remainingPartsArray[2]
 	default:
 		log.Println("invalid command")
