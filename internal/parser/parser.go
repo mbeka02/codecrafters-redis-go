@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/codecrafters-io/redis-starter-go/internal/store"
 )
@@ -97,34 +98,47 @@ func Parse(payload []byte) (string, error) {
 	command := strings.ToUpper(elements[0])
 	switch command {
 	case "ECHO":
-		return handleEcho(elements)
+		return p.handleEcho(elements)
 	case "PING":
 		return "+PONG\r\n", nil
 	case "SET":
-		return handleSet(elements)
+		return p.handleSet(elements)
 	case "GET":
-		return handleGet(elements)
+		return p.handleGet(elements)
 	default:
 		return "", fmt.Errorf("unknown command: %q", command)
 	}
 }
 
 // handleSet sets a key to a value and return a RESP simple string
-func handleSet(elements []string) (string, error) {
-	if len(elements) < 2 {
-		return "", fmt.Errorf("SET requires exactly 1 argument, got %d", len(elements)-1)
+func (p *Parser) handleSet(elements []string) (string, error) {
+	if len(elements) < 3 {
+		return "", fmt.Errorf("SET requires exactly 2 arguments, got %d", len(elements)-1)
 	}
-	fmt.Println("SET elements:", elements)
+	key := elements[1]
+	val := elements[2]
+	expiresAt := time.Now().Add(time.Duration(3600) * time.Second)
+	p.store.Set(key, store.Value{Data: val, ExpiresAt: &expiresAt})
 	return "+OK\r\n", nil
 }
 
-func handleGet(elements []string) (string, error) {
+// handleGet gets the value using a key and return a RESP bulk string if the value exists and an empty bulk string if it doesn't
+func (p *Parser) handleGet(elements []string) (string, error) {
 	fmt.Println("GET elements:", elements)
-	return "", nil
+	if len(elements) < 2 {
+		return "", fmt.Errorf("GET requires exactly 1 argument, got %d", len(elements)-1)
+	}
+	key := elements[1]
+	value, exists := p.store.Get(key)
+	if exists {
+		return fmt.Sprintf("$%d\r\n%s\r\n", len(value), value), nil
+	} else {
+		return "$-1\r\n", nil
+	}
 }
 
 // handleEcho validates args and returns the RESP bulk string response.
-func handleEcho(elements []string) (string, error) {
+func (p *Parser) handleEcho(elements []string) (string, error) {
 	if len(elements) < 2 {
 		return "", fmt.Errorf("ECHO requires exactly 1 argument, got %d", len(elements)-1)
 	}
