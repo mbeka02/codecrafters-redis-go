@@ -47,4 +47,4 @@ func Parse(payload []byte) (response string, err error) {
 	return response, nil
 }
 
-func handleEcho()
+func handleEcho() {}
