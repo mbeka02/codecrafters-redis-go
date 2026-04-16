@@ -11,6 +11,8 @@ import (
 	"github.com/codecrafters-io/redis-starter-go/internal/store"
 )
 
+var globalStore = store.NewStore()
+
 func handleConnection(conn net.Conn) {
 	for {
 		// defer func() {
@@ -29,8 +31,7 @@ func handleConnection(conn net.Conn) {
 			}
 			return
 		}
-		store := store.NewStore()
-		response, err := parser.Parse(buf[:n], store) // only parse upto what was read
+		response, err := parser.Parse(buf[:n], globalStore) // only parse upto what was read
 		if err != nil {
 			log.Println("parse error:", err)
 			conn.Write([]byte("-ERR " + err.Error() + "\r\n")) // send RESP error to client
