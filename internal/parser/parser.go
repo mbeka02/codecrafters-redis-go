@@ -104,6 +104,8 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		return p.handleSet(elements)
 	case "GET":
 		return p.handleGet(elements)
+	case "RPUSH":
+		return p.handleRPush(elements)
 	default:
 		return "", fmt.Errorf("unknown command: %q", command)
 	}
