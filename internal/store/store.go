@@ -43,7 +43,7 @@ func (s *Store) Get(key string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-
+	// lazy expiration on access , I think this is better than having a cleanup go-routine
 	if val.ExpiresAt != nil && time.Now().After(*val.ExpiresAt) {
 		s.Delete(key)
 		return "", false

@@ -116,9 +116,19 @@ func (p *Parser) handleSet(elements []string) (string, error) {
 		return "", fmt.Errorf("SET requires atleast 2 arguments, got %d", len(elements)-1)
 	}
 	log.Println("elements:", elements)
+	var expiresAt time.Time
 	key := elements[1]
 	val := elements[2]
-	expiresAt := time.Now().Add(time.Duration(3600) * time.Second)
+	option := elements[3]
+	optionValue, _ := strconv.Atoi(elements[4])
+	switch option {
+	case "EX":
+		expiresAt = time.Now().Add(time.Duration(optionValue) * time.Second)
+	case "PX":
+		expiresAt = time.Now().Add(time.Duration(optionValue) * time.Millisecond)
+	default:
+		log.Println("invalid option for the set command")
+	}
 	p.store.Set(key, store.Value{Data: val, ExpiresAt: &expiresAt})
 	return "+OK\r\n", nil
 }
