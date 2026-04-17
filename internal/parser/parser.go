@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -112,8 +113,9 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 // handleSet sets a key to a value and return a RESP simple string
 func (p *Parser) handleSet(elements []string) (string, error) {
 	if len(elements) < 3 {
-		return "", fmt.Errorf("SET requires exactly 2 arguments, got %d", len(elements)-1)
+		return "", fmt.Errorf("SET requires atleast 2 arguments, got %d", len(elements)-1)
 	}
+	log.Println("elements:", elements)
 	key := elements[1]
 	val := elements[2]
 	expiresAt := time.Now().Add(time.Duration(3600) * time.Second)

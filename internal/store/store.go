@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
@@ -37,7 +36,6 @@ func (s *Store) Set(key string, value Value) {
 }
 
 func (s *Store) Get(key string) (string, bool) {
-	fmt.Println("current store:", s.data)
 	s.mu.RLock()
 	val, ok := s.data[key]
 	s.mu.RUnlock()
