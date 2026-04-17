@@ -7,6 +7,7 @@ import (
 
 type Value struct {
 	Data      string
+	List      []string // used for LPUSH,LRANGE and RPUSH
 	ExpiresAt *time.Time
 }
 
@@ -35,19 +36,19 @@ func (s *Store) Set(key string, value Value) {
 	s.mu.Unlock()
 }
 
-func (s *Store) Get(key string) (string, bool) {
+func (s *Store) Get(key string) (Value, bool) {
 	s.mu.RLock()
 	val, ok := s.data[key]
 	s.mu.RUnlock()
 
 	if !ok {
-		return "", false
+		return Value{}, false
 	}
 	// lazy expiration on access , I think this is better than having a cleanup go-routine
 	if val.ExpiresAt != nil && time.Now().After(*val.ExpiresAt) {
 		s.Delete(key)
-		return "", false
+		return Value{}, false
 	}
 
-	return val.Data, true
+	return val, true
 }

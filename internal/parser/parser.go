@@ -152,7 +152,7 @@ func (p *Parser) handleGet(elements []string) (string, error) {
 	key := elements[1]
 	value, exists := p.store.Get(key)
 	if exists {
-		return fmt.Sprintf("$%d\r\n%s\r\n", len(value), value), nil
+		return fmt.Sprintf("$%d\r\n%s\r\n", len(value.Data), value.Data), nil
 	} else {
 		return "$-1\r\n", nil
 	}
@@ -166,4 +166,19 @@ func (p *Parser) handleEcho(elements []string) (string, error) {
 	msg := elements[1]
 	// Encode the response as a RESP bulk string: $<len>\r\n<data>\r\n
 	return fmt.Sprintf("$%d\r\n%s\r\n", len(msg), msg), nil
+}
+
+func (p *Parser) handleRPush(elements []string) (string, error) {
+	if len(elements) < 3 {
+		return "", fmt.Errorf("RPUSH requires at least 2 arguments, got %d", len(elements)-1)
+	}
+
+	key := elements[1]
+	newItems := elements[2:]
+
+	existing, _ := p.store.Get(key) // returns zero Value if the key doesn't exist
+	updated := append(existing.List, newItems...)
+	p.store.Set(key, store.Value{List: updated})
+
+	return fmt.Sprintf(":%d\r\n", len(updated)), nil
 }
