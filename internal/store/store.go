@@ -81,6 +81,32 @@ func (s *Store) LPush(key string, values []string) int {
 	return len(updated)
 }
 
+func (s *Store) RPush(key string, values []string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	list := s.data[key].List
+	updated := append(list, values...)
+
+	// wake waiter if exists
+	if waiters, ok := s.waiters[key]; ok && len(waiters) > 0 {
+		ch := waiters[0]
+		s.waiters[key] = waiters[1:]
+
+		// pop from LEFT (BLPOP semantics!)
+		val := updated[0]
+		updated = updated[1:]
+
+		s.data[key] = Value{List: updated}
+
+		go func() { ch <- val }()
+		return len(updated)
+	}
+
+	s.data[key] = Value{List: updated}
+	return len(updated)
+}
+
 func (s *Store) LPop(key string, count int) ([]string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

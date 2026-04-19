@@ -191,12 +191,8 @@ func (p *Parser) handleRPush(elements []string) (string, error) {
 
 	key := elements[1]
 	newItems := elements[2:]
-
-	existing, _ := p.store.Get(key) // returns zero Value if the key doesn't exist
-	updated := append(existing.List, newItems...)
-	p.store.Set(key, store.Value{List: updated})
-
-	return fmt.Sprintf(":%d\r\n", len(updated)), nil
+	length := p.store.RPush(key, newItems)
+	return fmt.Sprintf(":%d\r\n", length), nil
 }
 
 func (p *Parser) handleLPush(elements []string) (string, error) {
