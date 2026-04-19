@@ -184,3 +184,38 @@ func (p *Parser) handleRPush(elements []string) (string, error) {
 
 	return fmt.Sprintf(":%d\r\n", len(updated)), nil
 }
+
+func (p *Parser) handleLRange(elements []string) (string, error) {
+	if len(elements) < 4 {
+		return "", fmt.Errorf("LRange requires at least 3 arguments, got %d", len(elements)-1)
+	}
+	key := elements[1]
+	start := elements[2]
+	end := elements[3]
+	startIdx, _ := strconv.Atoi(start)
+	endIdx, _ := strconv.Atoi(end)
+	existing, _ := p.store.Get(key)
+	listLength := len(existing.List)
+	// handle empty array
+	if listLength == 0 {
+		return "*0\r\n", nil
+	}
+	/*
+	   If the start index is greater than or equal to the list's length, an empty array is returned.
+	*/
+	if startIdx >= listLength {
+		return "*0\r\n", nil
+	}
+	/*
+	   If the start index is greater than the stop index, an empty array is returned.
+	*/
+	if startIdx > endIdx {
+		return "*0\r\n", nil
+	}
+	bulkString := fmt.Sprintf("*%v\r\n", listLength)
+	for _, value := range existing.List {
+		entry := fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)
+		bulkString += entry
+	}
+	return bulkString, nil
+}
