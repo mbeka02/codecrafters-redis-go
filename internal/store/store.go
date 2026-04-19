@@ -12,8 +12,9 @@ type Value struct {
 }
 
 type Store struct {
-	mu   sync.RWMutex
-	data map[string]Value
+	mu      sync.RWMutex
+	data    map[string]Value
+	waiters map[string][]chan string
 }
 
 func NewStore() *Store {
@@ -51,4 +52,101 @@ func (s *Store) Get(key string) (Value, bool) {
 	}
 
 	return val, true
+}
+
+func (s *Store) LPush(key string, values []string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	list := s.data[key].List
+
+	for i, j := 0, len(values)-1; i < j; i, j = i+1, j-1 {
+		values[i], values[j] = values[j], values[i]
+	}
+
+	updated := append(values, list...)
+	s.data[key] = Value{List: updated}
+
+	if waiters, ok := s.waiters[key]; ok && len(waiters) > 0 {
+		ch := waiters[0]
+		s.waiters[key] = waiters[1:]
+
+		val := updated[0]
+		s.data[key] = Value{List: updated[1:]}
+
+		ch <- val
+	}
+
+	return len(updated)
+}
+
+func (s *Store) LPop(key string, count int) ([]string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	list := s.data[key].List
+	if len(list) == 0 {
+		return nil, false
+	}
+
+	if count <= 0 {
+		return nil, false
+	}
+
+	if count > len(list) {
+		count = len(list)
+	}
+
+	popped := list[:count]
+	remaining := list[count:]
+
+	s.data[key] = Value{List: remaining}
+
+	return popped, true
+}
+
+func (s *Store) BLPop(key string, timeout time.Duration) (string, bool) {
+	// fast path (no blocking)
+	if val, ok := s.LPop(key, 1); ok {
+		return val[0], true
+	}
+
+	ch := make(chan string, 1)
+
+	s.addWaiter(key, ch)
+
+	if timeout == 0 {
+		// block forever
+		val := <-ch
+		return val, true
+	}
+
+	select {
+	case val := <-ch:
+		return val, true
+
+	case <-time.After(timeout):
+		s.removeWaiter(key, ch)
+		return "", false
+	}
+}
+
+func (s *Store) addWaiter(key string, ch chan string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.waiters[key] = append(s.waiters[key], ch)
+}
+
+func (s *Store) removeWaiter(key string, target chan string) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	waiters := s.waiters[key]
+	for i, ch := range waiters {
+		if ch == target {
+			s.waiters[key] = append(waiters[:i], waiters[i+1:]...)
+			break
+		}
+	}
 }
