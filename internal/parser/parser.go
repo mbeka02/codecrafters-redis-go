@@ -112,6 +112,8 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		return p.handleLRange(elements)
 	case "LLEN":
 		return p.handleLLen(elements)
+	case "LPOP":
+		return p.handleLPop(elements)
 	default:
 		return "", fmt.Errorf("unknown command: %q", command)
 	}
@@ -271,4 +273,19 @@ func (p *Parser) handleLLen(elements []string) (string, error) {
 	key := elements[1]
 	existing, _ := p.store.Get(key)
 	return fmt.Sprintf(":%d\r\n", len(existing.List)), nil
+}
+
+func (p *Parser) handleLPop(elements []string) (string, error) {
+	if len(elements) < 2 {
+		return "", fmt.Errorf("LPOP requires exactly 1 argument, got %d", len(elements)-1)
+	}
+	key := elements[1]
+	existing, _ := p.store.Get(key)
+	listLength := len(existing.List)
+	if listLength > 0 {
+		element := existing.List[:1]
+		return fmt.Sprintf("$%d\r\n%s\r\n", len(element), element), nil
+	} else {
+		return "$-1\r\n", nil
+	}
 }
