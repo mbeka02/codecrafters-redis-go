@@ -187,6 +187,26 @@ func (p *Parser) handleRPush(elements []string) (string, error) {
 	return fmt.Sprintf(":%d\r\n", len(updated)), nil
 }
 
+func (p *Parser) handleLPush(elements []string) (string, error) {
+	if len(elements) < 3 {
+		return "", fmt.Errorf("RPUSH requires at least 2 arguments, got %d", len(elements)-1)
+	}
+
+	key := elements[1]
+	newItems := elements[2:]
+
+	// order the appropriately
+	for left, right := 0, len(newItems)-1; left < right; left, right = left+1, right-1 {
+		newItems[left], newItems[right] = newItems[right], newItems[left]
+	}
+
+	existing, _ := p.store.Get(key) // returns zero Value if the key doesn't exist
+	updated := append(newItems, existing.List...)
+	p.store.Set(key, store.Value{List: updated})
+
+	return fmt.Sprintf(":%d\r\n", len(updated)), nil
+}
+
 func (p *Parser) handleLRange(elements []string) (string, error) {
 	if len(elements) < 4 {
 		return "", fmt.Errorf("LRange requires at least 3 arguments, got %d", len(elements)-1)
