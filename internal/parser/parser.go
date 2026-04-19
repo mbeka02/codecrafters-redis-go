@@ -106,6 +106,8 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		return p.handleGet(elements)
 	case "RPUSH":
 		return p.handleRPush(elements)
+	case "LPUSH":
+		return p.handleLPush(elements)
 	case "LRANGE":
 		return p.handleLRange(elements)
 	default:
@@ -189,7 +191,7 @@ func (p *Parser) handleRPush(elements []string) (string, error) {
 
 func (p *Parser) handleLPush(elements []string) (string, error) {
 	if len(elements) < 3 {
-		return "", fmt.Errorf("RPUSH requires at least 2 arguments, got %d", len(elements)-1)
+		return "", fmt.Errorf("LPUSH requires at least 2 arguments, got %d", len(elements)-1)
 	}
 
 	key := elements[1]
