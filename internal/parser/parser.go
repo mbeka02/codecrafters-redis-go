@@ -214,8 +214,9 @@ func (p *Parser) handleLRange(elements []string) (string, error) {
 	if startIdx > endIdx {
 		return "*0\r\n", nil
 	}
-	bulkString := fmt.Sprintf("*%v\r\n", listLength)
-	for _, value := range existing.List {
+	rangedList := existing.List[startIdx : endIdx+1]
+	bulkString := fmt.Sprintf("*%v\r\n", len(rangedList))
+	for _, value := range rangedList {
 		entry := fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)
 		bulkString += entry
 	}
