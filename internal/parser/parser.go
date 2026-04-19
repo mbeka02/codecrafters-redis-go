@@ -99,7 +99,7 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 	case "ECHO":
 		return p.handleEcho(elements)
 	case "PING":
-		return "+PONG\r\n", nil
+		return p.handlePing()
 	case "SET":
 		return p.handleSet(elements)
 	case "GET":
@@ -110,9 +110,15 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		return p.handleLPush(elements)
 	case "LRANGE":
 		return p.handleLRange(elements)
+	case "LLEN":
+		return p.handleLLen(elements)
 	default:
 		return "", fmt.Errorf("unknown command: %q", command)
 	}
+}
+
+func (p *Parser) handlePing() (string, error) {
+	return "+PONG\r\n", nil
 }
 
 // handleSet sets a key to a value and return a RESP simple string
