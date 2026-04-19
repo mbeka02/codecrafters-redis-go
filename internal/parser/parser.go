@@ -257,3 +257,12 @@ func (p *Parser) handleLRange(elements []string) (string, error) {
 
 	return bulkString, nil
 }
+
+func (p *Parser) handleLLen(elements []string) (string, error) {
+	if len(elements) < 2 {
+		return "", fmt.Errorf("LLEN requires exactly 1 argument, got %d", len(elements)-1)
+	}
+	key := elements[1]
+	existing, _ := p.store.Get(key)
+	return fmt.Sprintf(":%d\r\n", len(existing.List)), nil
+}
