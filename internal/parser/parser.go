@@ -215,7 +215,7 @@ func (p *Parser) handleBLPop(elements []string) (string, error) {
 
 	key := elements[1]
 
-	timeoutSec, err := strconv.Atoi(elements[2])
+	timeoutSec, err := strconv.ParseFloat(elements[2], 64)
 	if err != nil {
 		return "", fmt.Errorf("invalid timeout")
 	}
