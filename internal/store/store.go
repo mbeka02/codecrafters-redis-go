@@ -55,32 +55,31 @@ func (s *Store) Get(key string) (Value, bool) {
 	return val, true
 }
 
-func (s *Store) LPush(key string, values []string) int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	list := s.data[key].List
-
-	for i, j := 0, len(values)-1; i < j; i, j = i+1, j-1 {
-		values[i], values[j] = values[j], values[i]
-	}
-
-	updated := append(values, list...)
-	updated, _ = s.notifyWaiterIfAny(key, updated)
-	s.data[key] = Value{List: updated}
-	return len(updated)
-}
-
 func (s *Store) RPush(key string, values []string) int {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	list := s.data[key].List
-
 	updated := append(list, values...)
+	length := len(updated) // capture length BEFORE notify consumes an element
 	updated, _ = s.notifyWaiterIfAny(key, updated)
 	s.data[key] = Value{List: updated}
-	return len(updated)
+	return length // return pre-notify length
+}
+
+func (s *Store) LPush(key string, values []string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	list := s.data[key].List
+	for i, j := 0, len(values)-1; i < j; i, j = i+1, j-1 {
+		values[i], values[j] = values[j], values[i]
+	}
+	updated := append(values, list...)
+	length := len(updated)
+	updated, _ = s.notifyWaiterIfAny(key, updated)
+	s.data[key] = Value{List: updated}
+	return length
 }
 
 func (s *Store) LPop(key string, count int) ([]string, bool) {
