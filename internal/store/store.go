@@ -67,7 +67,7 @@ func (s *Store) LPush(key string, values []string) int {
 
 	updated := append(values, list...)
 	updated, _ = s.notifyWaiterIfAny(key, updated)
-
+	s.data[key] = Value{List: updated}
 	return len(updated)
 }
 
@@ -109,17 +109,23 @@ func (s *Store) LPop(key string, count int) ([]string, bool) {
 }
 
 func (s *Store) BLPop(key string, timeout time.Duration) (string, bool) {
-	// fast path (no blocking)
-	if val, ok := s.LPop(key, 1); ok {
-		return val[0], true
+	// fast path + waiter registration must be atomic — no gap between
+	// "list is empty" and "I'm registered to receive notifications"
+	s.mu.Lock()
+	list := s.data[key].List
+	if len(list) > 0 {
+		val := list[0]
+		s.data[key] = Value{List: list[1:]}
+		s.mu.Unlock()
+		return val, true
 	}
 
+	// list is empty — register waiter while still holding the lock
 	ch := make(chan string, 1)
-
-	s.addWaiter(key, ch)
+	s.waiters[key] = append(s.waiters[key], ch)
+	s.mu.Unlock()
 
 	if timeout == 0 {
-		// block forever
 		val := <-ch
 		return val, true
 	}
@@ -127,7 +133,6 @@ func (s *Store) BLPop(key string, timeout time.Duration) (string, bool) {
 	select {
 	case val := <-ch:
 		return val, true
-
 	case <-time.After(timeout):
 		s.removeWaiter(key, ch)
 		return "", false
