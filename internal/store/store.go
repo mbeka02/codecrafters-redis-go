@@ -66,17 +66,7 @@ func (s *Store) LPush(key string, values []string) int {
 	}
 
 	updated := append(values, list...)
-	s.data[key] = Value{List: updated}
-
-	if waiters, ok := s.waiters[key]; ok && len(waiters) > 0 {
-		ch := waiters[0]
-		s.waiters[key] = waiters[1:]
-
-		val := updated[0]
-		s.data[key] = Value{List: updated[1:]}
-
-		ch <- val
-	}
+	updated, _ = s.notifyWaiterIfAny(key, updated)
 
 	return len(updated)
 }
@@ -86,23 +76,9 @@ func (s *Store) RPush(key string, values []string) int {
 	defer s.mu.Unlock()
 
 	list := s.data[key].List
+
 	updated := append(list, values...)
-
-	// wake waiter if exists
-	if waiters, ok := s.waiters[key]; ok && len(waiters) > 0 {
-		ch := waiters[0]
-		s.waiters[key] = waiters[1:]
-
-		// pop from LEFT (BLPOP semantics!)
-		val := updated[0]
-		updated = updated[1:]
-
-		s.data[key] = Value{List: updated}
-
-		go func() { ch <- val }()
-		return len(updated)
-	}
-
+	updated, _ = s.notifyWaiterIfAny(key, updated)
 	s.data[key] = Value{List: updated}
 	return len(updated)
 }
@@ -176,4 +152,21 @@ func (s *Store) removeWaiter(key string, target chan string) {
 			break
 		}
 	}
+}
+
+func (s *Store) notifyWaiterIfAny(key string, list []string) ([]string, bool) {
+	waiters := s.waiters[key]
+	if len(waiters) == 0 {
+		return list, false
+	}
+
+	ch := waiters[0]
+	s.waiters[key] = waiters[1:]
+
+	val := list[0]
+	list = list[1:]
+
+	go func() { ch <- val }()
+
+	return list, true
 }
