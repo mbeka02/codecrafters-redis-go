@@ -19,7 +19,8 @@ type Store struct {
 
 func NewStore() *Store {
 	return &Store{
-		data: make(map[string]Value),
+		data:    make(map[string]Value),
+		waiters: make(map[string][]chan string),
 	}
 }
 
