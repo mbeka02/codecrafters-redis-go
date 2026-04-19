@@ -191,39 +191,47 @@ func (p *Parser) handleLRange(elements []string) (string, error) {
 	if len(elements) < 4 {
 		return "", fmt.Errorf("LRange requires at least 3 arguments, got %d", len(elements)-1)
 	}
+
 	key := elements[1]
-	start := elements[2]
-	end := elements[3]
-	startIdx, _ := strconv.Atoi(start)
-	endIdx, _ := strconv.Atoi(end)
+	startIdx, _ := strconv.Atoi(elements[2])
+	endIdx, _ := strconv.Atoi(elements[3])
+
 	existing, _ := p.store.Get(key)
-	listLength := len(existing.List)
-	// handle empty array
+	list := existing.List
+	listLength := len(list)
+
+	// empty list
 	if listLength == 0 {
 		return "*0\r\n", nil
 	}
-	/*
-	   If the start index is greater than or equal to the list's length, an empty array is returned.
-	*/
-	if startIdx >= listLength {
-		return "*0\r\n", nil
+
+	// Handles negative indices
+	if startIdx < 0 {
+		startIdx += listLength
 	}
-	/*
-	   If the start index is greater than the stop index, an empty array is returned.
-	*/
-	if startIdx > endIdx {
-		return "*0\r\n", nil
+	if endIdx < 0 {
+		endIdx += listLength
 	}
-	// clamp the end index
+
+	// Clamp indices
+	if startIdx < 0 {
+		startIdx = 0
+	}
 	if endIdx >= listLength {
 		endIdx = listLength - 1
 	}
 
-	rangedList := existing.List[startIdx : endIdx+1]
-	bulkString := fmt.Sprintf("*%v\r\n", len(rangedList))
-	for _, value := range rangedList {
-		entry := fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)
-		bulkString += entry
+	if startIdx >= listLength || startIdx > endIdx {
+		return "*0\r\n", nil
 	}
+
+	rangedList := list[startIdx : endIdx+1]
+
+	// build RESP response
+	bulkString := fmt.Sprintf("*%d\r\n", len(rangedList))
+	for _, value := range rangedList {
+		bulkString += fmt.Sprintf("$%d\r\n%s\r\n", len(value), value)
+	}
+
 	return bulkString, nil
 }
