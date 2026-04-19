@@ -220,12 +220,11 @@ func (p *Parser) handleBLPop(elements []string) (string, error) {
 		return "", fmt.Errorf("invalid timeout")
 	}
 
-	timeout := time.Duration(timeoutSec) * time.Second
-
+	timeout := time.Duration(timeoutSec * float64(time.Second))
 	val, ok := p.store.BLPop(key, timeout)
 
 	if !ok {
-		return "$-1\r\n", nil
+		return "*-1\r\n", nil
 	}
 
 	return fmt.Sprintf("*2\r\n$%d\r\n%s\r\n$%d\r\n%s\r\n",
