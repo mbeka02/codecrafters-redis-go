@@ -104,6 +104,7 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		return p.handleSet(elements)
 	case "GET":
 		return p.handleGet(elements)
+		// lists
 	case "RPUSH":
 		return p.handleRPush(elements)
 	case "LPUSH":
@@ -116,6 +117,9 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		return p.handleLPop(elements)
 	case "BLPOP":
 		return p.handleBLPop(elements)
+		// type
+	case "TYPE":
+		return p.handleType(elements)
 	default:
 		return "", fmt.Errorf("unknown command: %q", command)
 	}
@@ -231,26 +235,6 @@ func (p *Parser) handleBLPop(elements []string) (string, error) {
 		len(key), key, len(val), val), nil
 }
 
-// func (p *Parser) handleLPush(elements []string) (string, error) {
-// 	if len(elements) < 3 {
-// 		return "", fmt.Errorf("LPUSH requires at least 2 arguments, got %d", len(elements)-1)
-// 	}
-//
-// 	key := elements[1]
-// 	newItems := elements[2:]
-//
-// 	// order the appropriately
-// 	for left, right := 0, len(newItems)-1; left < right; left, right = left+1, right-1 {
-// 		newItems[left], newItems[right] = newItems[right], newItems[left]
-// 	}
-//
-// 	existing, _ := p.store.Get(key) // returns zero Value if the key doesn't exist
-// 	updated := append(newItems, existing.List...)
-// 	p.store.Set(key, store.Value{List: updated})
-//
-// 	return fmt.Sprintf(":%d\r\n", len(updated)), nil
-// }
-
 func (p *Parser) handleLRange(elements []string) (string, error) {
 	if len(elements) < 4 {
 		return "", fmt.Errorf("LRange requires at least 3 arguments, got %d", len(elements)-1)
@@ -309,54 +293,6 @@ func (p *Parser) handleLLen(elements []string) (string, error) {
 	return fmt.Sprintf(":%d\r\n", len(existing.List)), nil
 }
 
-// func (p *Parser) handleLPop(elements []string) (string, error) {
-// 	if len(elements) < 2 {
-// 		return "", fmt.Errorf("LPOP requires at least 1 argument")
-// 	}
-//
-// 	key := elements[1]
-//
-// 	// default count = 1
-// 	count := 1
-// 	if len(elements) >= 3 {
-// 		c, err := strconv.Atoi(elements[2])
-// 		if err != nil || c <= 0 {
-// 			return "", fmt.Errorf("invalid count")
-// 		}
-// 		count = c
-// 	}
-//
-// 	existing, _ := p.store.Get(key)
-// 	list := existing.List
-//
-// 	if len(list) == 0 {
-// 		return "$-1\r\n", nil
-// 	}
-//
-// 	if count > len(list) {
-// 		count = len(list)
-// 	}
-//
-// 	popped := list[:count]
-// 	updated := list[count:]
-//
-// 	p.store.Set(key, store.Value{List: updated})
-//
-// 	// return array if multiple
-// 	if count == 1 {
-// 		element := popped[0]
-// 		return fmt.Sprintf("$%d\r\n%s\r\n", len(element), element), nil
-// 	}
-//
-// 	// RESP array
-// 	response := fmt.Sprintf("*%d\r\n", len(popped))
-// 	for _, el := range popped {
-// 		response += fmt.Sprintf("$%d\r\n%s\r\n", len(el), el)
-// 	}
-//
-// 	return response, nil
-// }
-
 func (p *Parser) handleLPop(elements []string) (string, error) {
 	if len(elements) < 2 {
 		return "", fmt.Errorf("LPOP requires at least 1 argument")
@@ -389,4 +325,17 @@ func (p *Parser) handleLPop(elements []string) (string, error) {
 	}
 
 	return response, nil
+}
+
+func (p *Parser) handleType(elements []string) (string, error) {
+	if len(elements) < 2 {
+		return "", fmt.Errorf("TYPE requires at least 1 argument")
+	}
+
+	key := elements[1]
+	_, exists := p.store.Get(key)
+	if !exists {
+		return "+none\r\n", nil
+	}
+	return "+string\r\n", nil
 }

@@ -108,7 +108,7 @@ func (s *Store) LPop(key string, count int) ([]string, bool) {
 }
 
 func (s *Store) BLPop(key string, timeout time.Duration) (string, bool) {
-	// fast path + waiter registration must be atomic — no gap between
+	// fast path + waiter registration must be atomic: no gap between
 	// "list is empty" and "I'm registered to receive notifications"
 	s.mu.Lock()
 	list := s.data[key].List
@@ -119,7 +119,7 @@ func (s *Store) BLPop(key string, timeout time.Duration) (string, bool) {
 		return val, true
 	}
 
-	// list is empty — register waiter while still holding the lock
+	// list is empty , register waiter while still holding the lock
 	ch := make(chan string, 1)
 	s.waiters[key] = append(s.waiters[key], ch)
 	s.mu.Unlock()
