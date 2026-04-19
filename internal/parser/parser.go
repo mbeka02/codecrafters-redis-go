@@ -277,15 +277,48 @@ func (p *Parser) handleLLen(elements []string) (string, error) {
 
 func (p *Parser) handleLPop(elements []string) (string, error) {
 	if len(elements) < 2 {
-		return "", fmt.Errorf("LPOP requires exactly 1 argument, got %d", len(elements)-1)
+		return "", fmt.Errorf("LPOP requires at least 1 argument")
 	}
+
 	key := elements[1]
+
+	// default count = 1
+	count := 1
+	if len(elements) >= 3 {
+		c, err := strconv.Atoi(elements[2])
+		if err != nil || c <= 0 {
+			return "", fmt.Errorf("invalid count")
+		}
+		count = c
+	}
+
 	existing, _ := p.store.Get(key)
-	listLength := len(existing.List)
-	if listLength > 0 {
-		element := existing.List[:1]
-		return fmt.Sprintf("$%d\r\n%s\r\n", len(element), element), nil
-	} else {
+	list := existing.List
+
+	if len(list) == 0 {
 		return "$-1\r\n", nil
 	}
+
+	if count > len(list) {
+		count = len(list)
+	}
+
+	popped := list[:count]
+	updated := list[count:]
+
+	p.store.Set(key, store.Value{List: updated})
+
+	// return array if multiple
+	if count == 1 {
+		element := popped[0]
+		return fmt.Sprintf("$%d\r\n%s\r\n", len(element), element), nil
+	}
+
+	// RESP array
+	response := fmt.Sprintf("*%d\r\n", len(popped))
+	for _, el := range popped {
+		response += fmt.Sprintf("$%d\r\n%s\r\n", len(el), el)
+	}
+
+	return response, nil
 }
