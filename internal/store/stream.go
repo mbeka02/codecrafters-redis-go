@@ -2,7 +2,6 @@ package store
 
 import (
 	"fmt"
-	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -59,8 +58,7 @@ func resolveID(raw string, last *StreamID) (StreamID, error) {
 	}
 	// special case: 0-0 is never valid
 	if parsed.Ms == 0 && parsed.Seq == 0 {
-		log.Println("block triggered")
-		return StreamID{}, fmt.Errorf("stream ID must be greater than 0-0")
+		return StreamID{}, fmt.Errorf("The ID specified in XADD must be greater than 0-0")
 	}
 
 	// validate strictly greater than last
