@@ -57,6 +57,11 @@ func resolveID(raw string, last *StreamID) (StreamID, error) {
 	if seqAuto {
 		parsed.Seq = nextSeq(parsed.Ms, last)
 	}
+	// special case: 0-0 is never valid
+	if parsed.Ms == 0 && parsed.Seq == 0 {
+		log.Println("block triggered")
+		return StreamID{}, fmt.Errorf("ERR stream ID must be greater than 0-0")
+	}
 
 	// validate strictly greater than last
 	if last != nil {
@@ -65,12 +70,6 @@ func resolveID(raw string, last *StreamID) (StreamID, error) {
 				"The ID specified in XADD is equal or smaller than the target stream top item",
 			)
 		}
-	}
-
-	// special case: 0-0 is never valid
-	if parsed.Ms == 0 && parsed.Seq == 0 {
-		log.Println("block triggered")
-		return StreamID{}, fmt.Errorf("ERR stream ID must be greater than 0-0")
 	}
 
 	return parsed, nil
