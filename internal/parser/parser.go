@@ -117,6 +117,9 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		return p.handleLPop(elements)
 	case "BLPOP":
 		return p.handleBLPop(elements)
+		// Streams
+	case "XADD":
+		return p.handleXAdd(elements)
 		// type
 	case "TYPE":
 		return p.handleType(elements)
