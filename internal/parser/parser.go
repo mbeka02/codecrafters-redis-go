@@ -339,3 +339,21 @@ func (p *Parser) handleType(elements []string) (string, error) {
 	}
 	return "+string\r\n", nil
 }
+
+// Streams
+func (p *Parser) handleXAdd(elements []string) (string, error) {
+	// elements: ["XADD", key, id, field1, val1, field2, val2, ...]
+	if len(elements) < 5 || len(elements)%2 == 0 {
+		return "", fmt.Errorf("XADD requires key, id, and field-value pairs")
+	}
+	key, id := elements[1], elements[2]
+	fields := make(map[string]string)
+	for i := 3; i < len(elements); i += 2 {
+		fields[elements[i]] = elements[i+1]
+	}
+	newId, err := p.store.XAdd(key, id, fields)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("$%d\r\n%s\r\n", len(newId), newId), nil
+}

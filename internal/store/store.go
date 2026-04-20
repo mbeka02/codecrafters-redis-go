@@ -1,13 +1,19 @@
 package store
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
 
+type StreamEntry struct {
+	Id     StreamID
+	Fields map[string]string
+}
 type Value struct {
 	Data      string
 	List      []string // used for LPUSH,LRANGE and RPUSH
+	Stream    []StreamEntry
 	ExpiresAt *time.Time
 }
 
@@ -173,4 +179,31 @@ func (s *Store) notifyWaiterIfAny(key string, list []string) ([]string, bool) {
 	go func() { ch <- val }()
 
 	return list, true
+}
+
+// Streams
+func (s *Store) XAdd(key, rawID string, fields map[string]string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	val := s.data[key]
+
+	var last *StreamID
+	if len(val.Stream) > 0 {
+		tip := val.Stream[len(val.Stream)-1].Id
+		last = &tip
+	}
+
+	id, err := resolveID(rawID, last)
+	if err != nil {
+		return "", err
+	}
+
+	val.Stream = append(val.Stream, StreamEntry{
+		Id:     id,
+		Fields: fields,
+	})
+	s.data[key] = val
+
+	return fmt.Sprintf("%d-%d", id.Ms, id.Seq), nil
 }
