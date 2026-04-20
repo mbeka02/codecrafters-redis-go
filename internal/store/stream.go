@@ -61,7 +61,7 @@ func resolveID(raw string, last *StreamID) (StreamID, error) {
 	if last != nil {
 		if parsed.Ms < last.Ms || (parsed.Ms == last.Ms && parsed.Seq <= last.Seq) {
 			return StreamID{}, fmt.Errorf(
-				"ERR The ID specified in XADD is equal or smaller than the target stream top item",
+				"The ID specified in XADD is equal or smaller than the target stream top item",
 			)
 		}
 	}
