@@ -336,11 +336,18 @@ func (p *Parser) handleType(elements []string) (string, error) {
 	}
 
 	key := elements[1]
-	_, exists := p.store.Get(key)
+	val, exists := p.store.Get(key)
 	if !exists {
 		return "+none\r\n", nil
 	}
-	return "+string\r\n", nil
+	switch {
+	case len(val.Stream) > 0:
+		return "+stream\r\n", nil
+	case len(val.List) > 0:
+		return "+list\r\n", nil
+	default:
+		return "+string\r\n", nil
+	}
 }
 
 // Streams
