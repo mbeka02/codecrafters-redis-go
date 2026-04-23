@@ -120,6 +120,8 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		// Streams
 	case "XADD":
 		return p.handleXAdd(elements)
+	case "XRANGE":
+		return p.handleXRange(elements)
 		// type
 	case "TYPE":
 		return p.handleType(elements)
@@ -366,4 +368,79 @@ func (p *Parser) handleXAdd(elements []string) (string, error) {
 		return "", err
 	}
 	return fmt.Sprintf("$%d\r\n%s\r\n", len(newId), newId), nil
+}
+
+func (p *Parser) handleXRange(elements []string) (string, error) {
+	if len(elements) < 4 {
+		return "", fmt.Errorf("XRANGE requires 3 arguments , got %d", len(elements)-1)
+	}
+	key := elements[1]
+	start := elements[2]
+	end := elements[3]
+	startID, err := parseRangeID(start, true)
+	if err != nil {
+		return "", err
+	}
+	endID, err := parseRangeID(end, false)
+	if err != nil {
+		return "", err
+	}
+	entries, err := p.store.XRange(key, startID, endID)
+
+	if len(entries) == 0 {
+		return "*0\r\n", nil
+	}
+	return encodeXRange(entries), nil
+}
+
+func encodeXRange(entries []store.StreamEntry) string {
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("*%d\r\n", len(entries)))
+
+	for _, entry := range entries {
+		id := fmt.Sprintf("%d-%d", entry.Id.Ms, entry.Id.Seq)
+
+		// each entry is a 2-element array: [id, fields]
+		sb.WriteString("*2\r\n")
+		sb.WriteString(fmt.Sprintf("$%d\r\n%s\r\n", len(id), id))
+
+		// flatten the map
+		sb.WriteString(fmt.Sprintf("*%d\r\n", len(entry.Fields)*2))
+		for field, value := range entry.Fields {
+			sb.WriteString(fmt.Sprintf("$%d\r\n%s\r\n", len(field), field))
+			sb.WriteString(fmt.Sprintf("$%d\r\n%s\r\n", len(value), value))
+		}
+	}
+
+	return sb.String()
+}
+
+func parseRangeID(raw string, isStart bool) (store.StreamID, error) {
+	if raw == "-" {
+		return store.StreamID{Ms: 0, Seq: 0}, nil
+	}
+	if raw == "+" {
+		return store.StreamID{Ms: ^uint64(0), Seq: ^uint64(0)}, nil
+	}
+
+	parts := strings.SplitN(raw, "-", 2)
+	ms, err := strconv.ParseUint(parts[0], 10, 64)
+	if err != nil {
+		return store.StreamID{}, fmt.Errorf("invalid ID: %w", err)
+	}
+
+	// no seq provided — apply the default
+	if len(parts) == 1 {
+		if isStart {
+			return store.StreamID{Ms: ms, Seq: 0}, nil
+		}
+		return store.StreamID{Ms: ms, Seq: ^uint64(0)}, nil
+	}
+
+	seq, err := strconv.ParseUint(parts[1], 10, 64)
+	if err != nil {
+		return store.StreamID{}, fmt.Errorf("invalid seq: %w", err)
+	}
+	return store.StreamID{Ms: ms, Seq: seq}, nil
 }

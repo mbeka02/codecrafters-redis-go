@@ -2,14 +2,72 @@ package store
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 )
 
+type StreamEntry struct {
+	Id     StreamID
+	Fields map[string]string
+}
 type StreamID struct {
 	Ms  uint64
 	Seq uint64
+}
+
+// Streams
+func (s *Store) XRange(key string, start, end StreamID) ([]StreamEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	entries := s.data[key].Stream
+	// binary search
+	// find first entry >= start
+	lo := sort.Search(len(entries), func(i int) bool {
+		return !idBefore(entries[i].Id, start) // entries[i].Id >= start
+	})
+
+	// find first entry > end, everything before it is <= end
+	hi := sort.Search(len(entries), func(i int) bool {
+		return idBefore(end, entries[i].Id) // entries[i].Id > end
+	})
+
+	return entries[lo:hi], nil
+}
+
+func idBefore(a, b StreamID) bool {
+	if a.Ms != b.Ms {
+		return a.Ms < b.Ms
+	}
+	return a.Seq < b.Seq
+}
+
+func (s *Store) XAdd(key, rawID string, fields map[string]string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	val := s.data[key]
+
+	var last *StreamID
+	if len(val.Stream) > 0 {
+		tip := val.Stream[len(val.Stream)-1].Id
+		last = &tip
+	}
+
+	id, err := resolveID(rawID, last)
+	if err != nil {
+		return "", err
+	}
+
+	val.Stream = append(val.Stream, StreamEntry{
+		Id:     id,
+		Fields: fields,
+	})
+	s.data[key] = val
+
+	return fmt.Sprintf("%d-%d", id.Ms, id.Seq), nil
 }
 
 func parseStreamID(raw string) (StreamID, bool, bool, error) {
@@ -50,7 +108,6 @@ func resolveID(raw string, last *StreamID) (StreamID, error) {
 
 	if msAuto {
 		parsed.Ms = now
-		seqAuto = true // force seq auto too
 	}
 
 	if seqAuto {
