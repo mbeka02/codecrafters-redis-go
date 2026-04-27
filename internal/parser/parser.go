@@ -2,6 +2,7 @@ package parser
 
 import (
 	"fmt"
+	"log"
 	"strconv"
 	"strings"
 	"time"
@@ -122,6 +123,8 @@ func Parse(payload []byte, s *store.Store) (string, error) {
 		return p.handleXAdd(elements)
 	case "XRANGE":
 		return p.handleXRange(elements)
+	case "XREAD":
+		return p.handleXRead(elements)
 		// type
 	case "TYPE":
 		return p.handleType(elements)
@@ -370,6 +373,44 @@ func (p *Parser) handleXAdd(elements []string) (string, error) {
 	return fmt.Sprintf("$%d\r\n%s\r\n", len(newId), newId), nil
 }
 
+func (p *Parser) handleXRead(elements []string) (string, error) {
+	// elements: ["XREAD",STREAMS key1 , id1 ,key2,id2 , ....]
+	log.Println("elements:", elements)
+	if len(elements) < 4 {
+		return "", fmt.Errorf("XRANGE requires atleast 3 arguments , got %d", len(elements)-1)
+	}
+	keysAndEntryIDs := elements[2:]
+	if len(keysAndEntryIDs)%2 != 0 {
+		return "", fmt.Errorf("XREAD expects an equal number of keys and IDs")
+	}
+	midpoint := len(keysAndEntryIDs) / 2
+	keys := keysAndEntryIDs[:midpoint]
+	rawIDs := keysAndEntryIDs[midpoint:]
+
+	// build response , one entry per key
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("*%d\r\n", len(keys)))
+
+	for i, key := range keys {
+		id, err := parseXReadID(rawIDs[i])
+		if err != nil {
+			return "", fmt.Errorf("invalid ID for key %q: %w", key, err)
+		}
+
+		entries, err := p.store.XRead(key, id)
+		if err != nil {
+			return "", err
+		}
+
+		// each key block: ["keyname", [entries...]]
+		sb.WriteString("*2\r\n")
+		sb.WriteString(fmt.Sprintf("$%d\r\n%s\r\n", len(key), key))
+		sb.WriteString(encodeXRange(entries)) // reuse existing encoder
+	}
+
+	return sb.String(), nil
+}
+
 func (p *Parser) handleXRange(elements []string) (string, error) {
 	if len(elements) < 4 {
 		return "", fmt.Errorf("XRANGE requires 3 arguments , got %d", len(elements)-1)
@@ -443,4 +484,12 @@ func parseRangeID(raw string, isStart bool) (store.StreamID, error) {
 		return store.StreamID{}, fmt.Errorf("invalid seq: %w", err)
 	}
 	return store.StreamID{Ms: ms, Seq: seq}, nil
+}
+
+func parseXReadID(raw string) (store.StreamID, error) {
+	if raw == "$" {
+		// basically return nothing that already exists
+		return store.StreamID{Ms: ^uint64(0), Seq: ^uint64(0)}, nil
+	}
+	return parseRangeID(raw, true)
 }

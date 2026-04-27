@@ -17,6 +17,17 @@ type StreamID struct {
 	Seq uint64
 }
 
+func (s *Store) XRead(key string, entryID StreamID) ([]StreamEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	entries := s.data[key].Stream
+	idx := sort.Search(len(entries), func(i int) bool {
+		return idBefore(entryID, entries[i].Id)
+	})
+	return entries[idx:], nil
+}
+
 // Streams
 func (s *Store) XRange(key string, start, end StreamID) ([]StreamEntry, error) {
 	s.mu.RLock()
